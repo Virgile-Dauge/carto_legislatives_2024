@@ -1,0 +1,6 @@
+source_data/européennes_2024/resultats-temporaires-par-circonscription.xlsx filter=lfs diff=lfs merge=lfs -text
+source_data/européennes_2024/resultats-temporaires-par-bureau-de-vote.xlsx filter=lfs diff=lfs merge=lfs -text
+source_data/européennes_2024/resultats-temporaires-par-commune.xlsx filter=lfs diff=lfs merge=lfs -text
+source_data/geometries/bureaux_votes.gpkg filter=lfs diff=lfs merge=lfs -text
+source_data/geometries/bureaux_votes_reco.gpkg filter=lfs diff=lfs merge=lfs -text
+source_data/geometries/circonscriptions.gpkg filter=lfs diff=lfs merge=lfs -text
