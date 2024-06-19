@@ -1,0 +1,5 @@
+*.br
+*.html
+/départements/
+/maps/
+/compressed_html/
