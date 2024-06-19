@@ -19,40 +19,42 @@ async def process_department(dep: str, election : str):
     print('Loading files...')
     input_dir = Path(f'./départements/{dep}')
     bv_gdf, ci_gdf = await load_geodata_async(input_dir, dep)
-    bv_df, ci_df = await load_data_async(input_dir, election, dep)
+    #bv_df, ci_df = await load_data_async(input_dir, election, dep)
+    
+    
+    #ci_df['ci_id'] = ci_df['ci_id'].astype(int)#.str.strip()
+    #ci_gdf['ci_id'] = ci_gdf['ci_id'].astype(int)#.str.strip()
+    #merged_ci = ci_gdf.merge(ci_df, on='ci_id')
+
+    #bv_df['bv_id'] = bv_df['bv_id'].astype(str)
+    #bv_gdf['bv_id'] = bv_gdf['bv_id'].astype(str)
+    #merged_bv = bv_gdf.merge(bv_df, on='bv_id')
+    #merged_ci.geometry = merged_ci.geometry.make_valid()
+    #merged_bv.geometry = merged_bv.geometry.make_valid()
+    
+
+    #def convert_to_polygon(geometry):
+    #    if geometry.geom_type == 'Polygon':
+    #        return geometry
+    #    elif geometry.geom_type == 'MultiPolygon':
+    #        # Return the largest polygon by area
+    #        return geometry
+    #        #return max(geometry, key=lambda a: a.area)
+    #    elif geometry.geom_type == 'GeometryCollection':
+    #        # Extract polygons from GeometryCollection
+    #        polygons = [geom for geom in geometry.geoms if isinstance(geom, Polygon)]
+    #        if polygons:
+    #            return max(polygons, key=lambda a: a.area)
+    #    return None
+    #merged_bv['geometry'] = merged_bv['geometry'].apply(convert_to_polygon)
+
     print('Computing features...')
-    
-    ci_df['ci_id'] = ci_df['ci_id'].astype(str).str.strip()
-    ci_gdf['ci_id'] = ci_gdf['ci_id'].astype(str).str.strip()
-    merged_ci = ci_gdf.merge(ci_df, on='ci_id')
-
-    bv_df['bv_id'] = bv_df['bv_id'].astype(str)
-    bv_gdf['bv_id'] = bv_gdf['bv_id'].astype(str)
-    merged_bv = bv_gdf.merge(bv_df, on='bv_id')
-    merged_ci.geometry = merged_ci.geometry.make_valid()
-    merged_bv.geometry = merged_bv.geometry.make_valid()
-    
-
-    def convert_to_polygon(geometry):
-        if geometry.geom_type == 'Polygon':
-            return geometry
-        elif geometry.geom_type == 'MultiPolygon':
-            # Return the largest polygon by area
-            return geometry
-            #return max(geometry, key=lambda a: a.area)
-        elif geometry.geom_type == 'GeometryCollection':
-            # Extract polygons from GeometryCollection
-            polygons = [geom for geom in geometry.geoms if isinstance(geom, Polygon)]
-            if polygons:
-                return max(polygons, key=lambda a: a.area)
-        return None
-    merged_bv['geometry'] = merged_bv['geometry'].apply(convert_to_polygon)
-    
-    final_gdf = compute_features(merged_bv, merged_ci)
+    final_gdf = compute_features(bv_gdf, ci_gdf)
     print('Creating map...')
-    m = create_map(final_gdf, merged_ci)
+    m = create_map(final_gdf, ci_gdf)
     print('Saving files...')
-    output_dir = Path(f'./départements/{dep}')
+    #output_dir = Path(f'./départements/{dep}')
+    output_dir = Path(f'./maps/{dep}')
     output_dir.mkdir(parents=True, exist_ok=True)
     await save_map_async(m, output_dir / Path(f'analyse_{election}_{dep}.html'))
 
@@ -67,7 +69,13 @@ async def main():
     else:
         departments = [d.name for d in Path('./départements').iterdir() if d.is_dir() and d.name.isdigit()]
 
-    tasks = [process_department(dep, 'euro24') for dep in departments]
+    semaphore = asyncio.Semaphore(4)  # Limit to 5 concurrent tasks
+
+    async def sem_task(dep):
+        async with semaphore:
+            await process_department(dep, 'euro24')
+
+    tasks = [sem_task(dep) for dep in departments]
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":

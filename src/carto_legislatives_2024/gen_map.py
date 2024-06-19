@@ -46,7 +46,8 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
 
     # Calculate the centroid of the entire GeoDataFrame
     centroid = ci_gdf.unary_union.centroid
-
+    #ci_gdf = ci_gdf.to_crs(epsg=3857)
+    #bv_gdf = bv_gdf.to_crs(epsg=3857)
     # Create a map centered on the center of the department
     m = folium.Map(location=[centroid.y, centroid.x], zoom_start=11)
 
@@ -93,6 +94,17 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
     # Add the pie chart layer to the map
     pie_chart_layer.add_to(m)
     
+    # Add a layer from ci_gdf
+    folium.GeoJson(
+        ci_gdf,
+        name='Circonscriptions',
+        style_function=lambda x: {
+            'fillColor': 'transparent',
+            'color': 'black',
+            'weight': 2,
+            'fillOpacity': 0.5
+        }
+    ).add_to(m)
     # Créer la legende personnalisée
     legend_html = '''
     <div style="position: fixed;
@@ -107,6 +119,7 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
         <i style="background: #bababa; width: 10px; height: 10px; display: inline-block;"></i> Abstention
     </div>
     '''
+
     # Ajouter une légende personnalisée à la carte
     m.get_root().html.add_child(folium.Element(legend_html))
 
