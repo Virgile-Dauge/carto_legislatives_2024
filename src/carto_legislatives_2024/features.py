@@ -23,14 +23,40 @@ def normalize_by_circo(votes_gdf, circo_gdf, columns):
 
     return votes_gdf
 
-def bloc_trois_model(x : Series, y : Series) -> Series:
+def coude_a_coude_model(x : Series, y : Series) -> Series:
     return (1-(x-y)**2*(x*(1-y)+y*(1-x)))**500
 
-def low_pass_model(x : Series, pow : int=10) -> Series:
-    threshold = x.quantile(0.95)
+def low_pass_model(x : Series, quantile : float, pow : int=10) -> Series:
+    threshold = x.quantile(quantile)
     rate = np.minimum(np.maximum(x + (1-threshold), 0), 1)
     return Series(np.sqrt(1-(rate)**pow))
 
+def compute_feature(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame, alpha: float, beta: float, gamma: float, delta: float) -> Series:
+    bv_gdf = bv_gdf.copy()
+    bv_gdf['abstension_rate'] = bv_gdf['% Abstentions'] / 100
+
+    bv_gdf['ed_rate'] = bv_gdf['extrême droite - % Voix/inscrits'] / 100
+    bv_gdf['trop_ed'] = low_pass_model(bv_gdf['ed_rate'], quantile=0.95)
+
+
+    # Utilisation de l'algèbre linéaire pour calculer les résultats
+    ci_gdf['max_M_E'] = np.maximum(ci_gdf['macronie - % Voix/inscrits'], ci_gdf['extrême droite - % Voix/inscrits']) / 100
+    ci_gdf['fp_rate'] = ci_gdf['front populaire - % Voix/inscrits'] / 100
+    ci_gdf['cac'] = coude_a_coude_model(ci_gdf['max_M_E'], ci_gdf['fp_rate'])
+
+    # Création d'une colonne pour les résultats dans bv_gdf
+    bv_gdf['cac_circo'] = 0
+
+    # Application des résultats de chaque circonscription aux bureaux de vote correspondants
+    for idx, circo in ci_gdf.iterrows():
+        circo_votes_gdf = bv_gdf[bv_gdf.intersects(circo.geometry)]
+        bv_gdf.loc[circo_votes_gdf.index, 'cac_circo'] = circo['cac']
+
+    return Series(alpha * bv_gdf['abstension_rate']
+            + beta * bv_gdf['ed_rate']
+            + gamma * bv_gdf['cac_circo']
+            + delta * bv_gdf['trop_ed']) / (alpha + beta + gamma + delta)
+    
 
 def compute_features(bv_gdf : GeoDataFrame, ci_gdf : GeoDataFrame) -> GeoDataFrame:
 
@@ -52,11 +78,11 @@ def compute_features(bv_gdf : GeoDataFrame, ci_gdf : GeoDataFrame) -> GeoDataFra
     for i, circo in ci_gdf.iterrows():
         circo_votes_gdf = bv_gdf[bv_gdf.intersects(circo.geometry)]
         result_test = []
-        ed = []
-        fp = []
+        #ed = []
+        #fp = []
         for j, row in circo_votes_gdf.iterrows():
-            ed.append(row['macronie - % Voix/inscrits']+row['extrême droite - % Voix/inscrits'])
-            fp.append(row['front populaire - % Voix/inscrits'])
+            #ed.append(row['macronie - % Voix/inscrits']+row['extrême droite - % Voix/inscrits'])
+            #fp.append(row['front populaire - % Voix/inscrits'])
 
             # Calculate the sum of 'macronie - % Voix/inscrits' and 'divers - % Voix/inscrits'
             sum_M = circo['macronie - % Voix/inscrits']# + circo['divers - % Voix/inscrits']
@@ -66,11 +92,11 @@ def compute_features(bv_gdf : GeoDataFrame, ci_gdf : GeoDataFrame) -> GeoDataFra
 
             # Find the maximum value between these sums
             max_value = np.maximum(sum_M, sum_E)
-            result_test.append(bloc_trois_model(max_value/100, circo['front populaire - % Voix/inscrits']/100))
+            result_test.append(coude_a_coude_model(max_value/100, circo['front populaire - % Voix/inscrits']/100))
 
         bv_gdf.loc[circo_votes_gdf.index, 'cac_circo'] = result_test
-        bv_gdf.loc[circo_votes_gdf.index, 'ed_circo'] = ed
-        bv_gdf.loc[circo_votes_gdf.index, 'fp_circo'] = fp
+        #bv_gdf.loc[circo_votes_gdf.index, 'ed_circo'] = ed
+        #bv_gdf.loc[circo_votes_gdf.index, 'fp_circo'] = fp
 
     alpha = 1
     beta = 6

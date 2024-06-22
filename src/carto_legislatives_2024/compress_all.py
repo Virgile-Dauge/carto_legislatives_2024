@@ -6,7 +6,8 @@ import brotli
 
 def compress_file(input_file_path: Path, output: Path):
 
-    output_file_path = output / (input_file_path.name + '.br')
+    #output_file_path = output / (input_file_path.name + '.br')
+    output_file_path = output / 'carte-complete-par-bureaux-de-vote-europeennes-2024.html.br'
     
     # Read the input file content
     with input_file_path.open('rb') as input_file:
