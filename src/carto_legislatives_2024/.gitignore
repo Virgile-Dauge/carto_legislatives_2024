@@ -1,5 +1,5 @@
 *.br
 *.html
-/départements/
-/maps/
-/compressed_html/
+départements/
+maps/
+compressed_html/
