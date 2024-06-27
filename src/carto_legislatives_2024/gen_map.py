@@ -22,7 +22,7 @@ def create_pie_chart(data, colors, circo_number=None):
                        color='white',)
         text = ax.text(0, 0, str(circo_number), ha='center', va='center', 
                        fontsize=20, fontweight='bold', 
-                       color='black',)  # Ajouter le numéro de la circo au centre avec une police plus grande et en gras
+                       color='darkslategray',)  # Ajouter le numéro de la circo au centre avec une police plus grande et en gras
     buff = StringIO()
     plt.savefig(buff, format="SVG", transparent=True)
     buff.seek(0)
@@ -49,14 +49,14 @@ def add_pie_charts_to_map(gdf : GeoDataFrame, to_display : dict[str, str], map_o
             ''')
         ).add_to(map_obj)
 
-def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
+def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame, layers : list[str] | None) -> folium.Map:
 
     # Calculate the centroid of the entire GeoDataFrame
     centroid = ci_gdf.unary_union.centroid
     #ci_gdf = ci_gdf.to_crs(epsg=3857)
     #bv_gdf = bv_gdf.to_crs(epsg=3857)
     # Create a map centered on the center of the department
-    m = folium.Map(location=[centroid.y, centroid.x], zoom_start=11)
+    m = folium.Map(location=[centroid.y, centroid.x], zoom_start=11, prefer_canvas=True)
 
     # Dictionary of columns to display and their colors
     to_display = {
@@ -69,6 +69,8 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
         'Où toucher les abstentionnistes': 'OrRd'
     }
 
+    if layers is not None:
+        to_display = {k: v for k, v in to_display.items() if k in layers}
     # Convert the GeoDataFrames to JSON
     ci_json = ci_gdf.to_json()
 
@@ -82,9 +84,13 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
             columns=['bv_id', column],
             key_on='feature.properties.bv_id',
             fill_color=color,
+            line_color='grey',
             fill_opacity=0.6,
             line_opacity=0.7,
             show=show,
+            highlight=True,
+            use_jenks=True,
+            smooth_factor=2,
             name=f'{column}'
         ).add_to(m)
 
@@ -103,16 +109,16 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
     pie_chart_layer.add_to(m)
     
     # Add a layer from ci_gdf
-    folium.GeoJson(
+    contours_circo = folium.GeoJson(
         ci_gdf,
         name='Circonscriptions',
         style_function=lambda x: {
             'fillColor': 'transparent',
-            'color': 'black',
-            'weight': 2,
+            'color': 'darkslategray',
+            'weight': 3,
             'fillOpacity': 0.5
         }
-    ).add_to(m)
+    )#.add_to(m)
     # Créer la legende personnalisée
     legend_html = '''
     <div style="position: fixed;
@@ -131,7 +137,10 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
     # Ajouter une légende personnalisée à la carte
     m.get_root().html.add_child(folium.Element(legend_html))
 
+    contours_circo.add_to(m)
+    m.keep_in_front(contours_circo)
     # Ajouter la couche de contrôle pour permettre d'activer/désactiver les couches
     folium.LayerControl().add_to(m)
     
+    #m.fit_bounds(m.get_bounds())
     return m
