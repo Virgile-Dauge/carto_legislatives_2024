@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
+import geopandas as gpd
 from pandas import DataFrame, Series
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 
 # Fonction pour normaliser les valeurs d'une colonne par circonscription
 def normalize_by_circo(votes_gdf, circo_gdf, columns):
@@ -44,13 +46,22 @@ def compute_feature(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame, alpha: float, be
     ci_gdf['fp_rate'] = ci_gdf['front populaire - % Voix/inscrits'] / 100
     ci_gdf['cac'] = coude_a_coude_model(ci_gdf['max_M_E'], ci_gdf['fp_rate'])
 
-    # Création d'une colonne pour les résultats dans bv_gdf
-    bv_gdf['cac_circo'] = 0
+    # Reprojeter les géométries dans un CRS projeté (par exemple, EPSG:3857)
+    bv_gdf_projected = bv_gdf.to_crs(epsg=3857)
+    ci_gdf_projected = ci_gdf.to_crs(epsg=3857)
 
-    # Application des résultats de chaque circonscription aux bureaux de vote correspondants
-    for idx, circo in ci_gdf.iterrows():
-        circo_votes_gdf = bv_gdf[bv_gdf.intersects(circo.geometry)]
-        bv_gdf.loc[circo_votes_gdf.index, 'cac_circo'] = circo['cac']
+    # Assurez-vous que les géométries sont valides
+    bv_gdf_projected.geometry = bv_gdf_projected.geometry.make_valid()
+    ci_gdf_projected.geometry = ci_gdf_projected.geometry.make_valid()
+    
+    # Calculer les centroïdes des bureaux de vote
+    bv_gdf_projected['centroid'] = bv_gdf_projected.centroid
+
+    # Utiliser sjoin pour joindre les centroïdes des bureaux de vote aux circonscriptions
+    joined_gdf = gpd.sjoin(bv_gdf_projected.set_geometry('centroid'), ci_gdf_projected, how="left", predicate="within")
+
+    # Mettre à jour la colonne 'cac_circo' dans bv_gdf
+    bv_gdf['cac_circo'] = joined_gdf['cac']
 
     return Series(alpha * bv_gdf['abstension_rate']
             + beta * bv_gdf['ed_rate']
