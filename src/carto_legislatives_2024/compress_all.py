@@ -49,10 +49,22 @@ def compress_html_files(source_dir: str, target_dir: str) -> None:
             except Exception as e:
                 print(f"An error occurred: {e}")
 
+import argparse
+
 def main():
-    source_dir = '~/workspace/carto_legislatives_2024/maps'
-    target_dir = '~/workspace/carto_legislatives_2024/compressed_html'
-    compress_html_files(source_dir, target_dir)
+    parser = argparse.ArgumentParser(description='Compresser les fichiers HTML.')
+    parser.add_argument('-s', '--source', type=str, default='~/workspace/carto_legislatives_2024/maps', help='Répertoire source des fichiers HTML')
+    parser.add_argument('-t', '--target', type=str, default='~/workspace/carto_legislatives_2024/compressed_html', help='Répertoire cible pour les fichiers compressés')
+    parser.add_argument('-f', '--file', type=str, help='Fichier HTML précis à compresser')
+    args = parser.parse_args()
+
+    if args.file:
+        source_file = Path(args.source).expanduser() / args.file
+        target_dir = Path(args.target).expanduser()
+        target_dir.mkdir(parents=True, exist_ok=True)
+        compress_file(source_file, target_dir)
+    else:
+        compress_html_files(args.source, args.target)
 
 if __name__ == "__main__":
     main()
