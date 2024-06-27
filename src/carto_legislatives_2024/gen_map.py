@@ -9,13 +9,20 @@ from io import StringIO
 from geopandas import GeoDataFrame
 from folium import Map
 
-def create_pie_chart(data, colors):
+def create_pie_chart(data, colors, circo_number=None):
     fig, ax = plt.subplots(figsize=(1, 1))
     ax.pie(data, colors=colors, labels=None, radius=1, wedgeprops=dict(width=0.3, edgecolor='w'))
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     ax.patch.set_alpha(0)
     fig.patch.set_alpha(0)
     ax.axis('equal')  # Assure que le graphique en camembert est un cercle
+    if circo_number is not None:
+        text = ax.text(0, 0, str(circo_number), ha='center', va='center', 
+                       fontsize=22, fontweight='bold', 
+                       color='white',)
+        text = ax.text(0, 0, str(circo_number), ha='center', va='center', 
+                       fontsize=20, fontweight='bold', 
+                       color='black',)  # Ajouter le numéro de la circo au centre avec une police plus grande et en gras
     buff = StringIO()
     plt.savefig(buff, format="SVG", transparent=True)
     buff.seek(0)
@@ -30,7 +37,7 @@ def add_pie_charts_to_map(gdf : GeoDataFrame, to_display : dict[str, str], map_o
     for idx, row in gdf.iterrows():
         centroid = row['geometry'].centroid
         data = row[columns].dropna().tolist()
-        pie_chart_svg = create_pie_chart(data, colors[:len(data)])
+        pie_chart_svg = create_pie_chart(data, colors[:len(data)], row['ci_id'][-2:])
         folium.Marker(
             location=[centroid.y, centroid.x],
             icon=folium.DivIcon(html=f'''
@@ -67,6 +74,7 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
 
     # Add the choropleth layers
     for column, color in to_display.items():
+        show = column == 'Où toucher les abstentionnistes'
         bv_json = bv_gdf[['bv_id', 'geometry']].to_json()
         folium.Choropleth(
             geo_data=bv_json,
@@ -74,9 +82,9 @@ def create_map(bv_gdf: GeoDataFrame, ci_gdf: GeoDataFrame) -> folium.Map:
             columns=['bv_id', column],
             key_on='feature.properties.bv_id',
             fill_color=color,
-            fill_opacity=0.7,
-            line_opacity=0.6,
-            show=False,
+            fill_opacity=0.6,
+            line_opacity=0.7,
+            show=show,
             name=f'{column}'
         ).add_to(m)
 
